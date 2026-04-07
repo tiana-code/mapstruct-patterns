@@ -2,7 +2,6 @@ package com.mapstructpatterns.mapper
 
 import org.mapstruct.Mapper
 import org.mapstruct.Mapping
-import org.mapstruct.NullValuePropertyMappingStrategy
 import com.mapstructpatterns.dto.request.CreateCertificateRequest
 import com.mapstructpatterns.dto.request.UpdateCertificateRequest
 import com.mapstructpatterns.dto.response.CertificateResponse
@@ -26,10 +25,7 @@ import java.util.UUID
  *   - Manual toEntity/updateEntity: entity uses protected set + domain constructor
  *   - vesselName is ignored on entity->response (enriched later from a separate service call)
  */
-@Mapper(
-    componentModel = "spring",
-    nullValuePropertyMappingStrategy = NullValuePropertyMappingStrategy.IGNORE
-)
+@Mapper(config = GlobalMapperConfig::class)
 abstract class CertificateMapper {
 
     @Mapping(target = "vesselName", ignore = true)

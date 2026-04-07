@@ -29,7 +29,7 @@ import com.mapstructpatterns.model.enums.ShipmentStatus
  * ALSO SHOWN HERE:
  *   - Manual toEntity: entity uses protected set + domain constructor
  */
-@Mapper(componentModel = "spring")
+@Mapper(config = GlobalMapperConfig::class)
 abstract class CargoShipmentMapper {
 
     fun toEntity(request: CreateCargoShipmentRequest): CargoShipment = CargoShipment(

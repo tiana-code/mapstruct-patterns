@@ -4,7 +4,6 @@ import org.mapstruct.IterableMapping
 import org.mapstruct.Mapper
 import org.mapstruct.Mapping
 import org.mapstruct.Named
-import org.mapstruct.NullValuePropertyMappingStrategy
 import com.mapstructpatterns.dto.request.CreateAuditFindingRequest
 import com.mapstructpatterns.dto.request.CreateAuditRequest
 import com.mapstructpatterns.dto.request.UpdateAuditFindingRequest
@@ -37,10 +36,7 @@ import java.util.UUID
  *   - Manual toEntity/updateEntity: entity uses protected set + domain constructor,
  *     so MapStruct cannot auto-generate entity creation — done manually via constructor
  */
-@Mapper(
-    componentModel = "spring",
-    nullValuePropertyMappingStrategy = NullValuePropertyMappingStrategy.IGNORE
-)
+@Mapper(config = GlobalMapperConfig::class)
 abstract class AuditMapper {
 
     @Named("toResponseWithFindings")

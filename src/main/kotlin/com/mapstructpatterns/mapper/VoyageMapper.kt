@@ -24,7 +24,7 @@ import java.util.UUID
  *   - toStatisticsResponse() null-guards: returns null if no statistics exist yet
  *   - sailingHours can be evaluated against an explicit reference time for deterministic tests
  */
-@Mapper(componentModel = "spring")
+@Mapper(config = GlobalMapperConfig::class)
 abstract class VoyageMapper {
 
     fun toEntity(request: CreateVoyageRequest, userId: UUID? = null): Voyage = Voyage(

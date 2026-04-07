@@ -1,7 +1,7 @@
 package com.mapstructpatterns.mapper
 
 import org.mapstruct.Mapper
-import org.mapstruct.NullValuePropertyMappingStrategy
+import org.mapstruct.Mapping
 import com.mapstructpatterns.dto.request.CreateOrganizationRequest
 import com.mapstructpatterns.dto.request.UpdateOrganizationRequest
 import com.mapstructpatterns.dto.response.OrganizationResponse
@@ -27,12 +27,9 @@ import com.mapstructpatterns.model.entity.Subscription
  *   - Active subscription lookup delegated to entity.activeSubscription()
  *   - Manual updateEntity delegates to entity.update()
  */
-@Mapper(
-    componentModel = "spring",
-    uses = [SubscriptionMapper::class],
-    nullValuePropertyMappingStrategy = NullValuePropertyMappingStrategy.IGNORE
-)
+@Mapper(config = GlobalMapperConfig::class, uses = [SubscriptionMapper::class])
 abstract class OrganizationMapper {
+    @Mapping(target = "tariffPlanName", source = "tariffPlan.name")
     protected abstract fun toSubscriptionSummary(entity: Subscription): SubscriptionSummaryResponse
 
     fun toDto(entity: Organization, usersCount: Int = 0, vesselsCount: Int = 0): OrganizationResponse {
@@ -78,7 +75,7 @@ abstract class OrganizationMapper {
     }
 }
 
-@Mapper(componentModel = "spring")
+@Mapper(config = GlobalMapperConfig::class)
 abstract class SubscriptionMapper {
 
     fun toSummaryDto(entity: Subscription): SubscriptionSummaryResponse = SubscriptionSummaryResponse(

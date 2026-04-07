@@ -1,7 +1,5 @@
 package com.mapstructpatterns.mapper
 
-import com.fasterxml.jackson.databind.ObjectMapper
-import com.fasterxml.jackson.module.kotlin.readValue
 import org.mapstruct.Mapper
 import com.mapstructpatterns.dto.request.CreateVoyageEventRequest
 import com.mapstructpatterns.dto.response.VoyageEventResponse
@@ -14,25 +12,25 @@ import java.time.Instant
  * Pattern 6: Spring-managed dependency inside a mapper for JSON conversion
  *
  * WHEN TO INJECT INTO A MAPPER:
- *   When mapping requires a Spring-managed service — here an ObjectMapper to serialize/deserialize
+ *   When mapping requires a Spring-managed service — here a MetadataCodec to serialize/deserialize
  *   a JSON metadata field stored as String in the entity but exposed as Map<String,Any> in the DTO.
  *
  * HOW IT WORKS:
- *   MapStruct with componentModel = "spring" generates a @Component class.
- *   Using `abstract class` allows manual methods to reuse the injected ObjectMapper.
+ *   MapStruct with GlobalMapperConfig generates a Spring @Component class.
+ *   Constructor injection via the config's injectionStrategy = CONSTRUCTOR.
+ *   JSON logic extracted into MetadataCodec — mapper stays focused on shape transformation.
  *
  * ALSO SHOWN HERE:
  *   - Two-argument toEntity(request, parentEntity): entity created via domain constructor,
  *     then attached to parent voyage
- *   - JSON round-trip: metadata stored as String entity field, deserialized on read
- *   - Silent fallback: malformed JSON metadata returns emptyMap() instead of throwing
+ *   - MetadataCodec handles JSON round-trip with logged fallback for malformed data
  *   - isDemoData inherited from parent voyage (not from request)
  */
-@Mapper(componentModel = "spring")
+@Mapper(config = GlobalMapperConfig::class)
 abstract class VoyageEventMapper {
 
     @Autowired
-    protected lateinit var objectMapper: ObjectMapper
+    protected lateinit var metadataCodec: MetadataCodec
 
     fun toEntity(
         request: CreateVoyageEventRequest,
@@ -45,7 +43,7 @@ abstract class VoyageEventMapper {
         latitude = request.latitude,
         longitude = request.longitude,
         description = request.description,
-        metadata = request.metadata?.let { objectMapper.writeValueAsString(it) },
+        metadata = metadataCodec.serialize(request.metadata),
         isDemoData = voyage.isDemoData,
         dataSource = voyage.dataSource,
         userId = voyage.userId,
@@ -63,13 +61,7 @@ abstract class VoyageEventMapper {
         latitude = event.latitude,
         longitude = event.longitude,
         description = event.description,
-        metadata = event.metadata?.let {
-            try {
-                objectMapper.readValue<Map<String, Any>>(it)
-            } catch (_: Exception) {
-                emptyMap()
-            }
-        },
+        metadata = metadataCodec.deserialize(event.metadata),
         isDemoData = event.isDemoData,
         dataSource = event.dataSource,
         userId = event.userId,

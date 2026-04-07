@@ -25,7 +25,7 @@ import com.mapstructpatterns.model.entity.CIIRecord
  *   - CIIRatingPolicy extracts domain interpretation (description/recommendation) from mapper
  *   - The is-prefix fix: isDemoData via expression
  */
-@Mapper(componentModel = "spring")
+@Mapper(config = GlobalMapperConfig::class)
 abstract class CIIRecordMapper {
 
     @Mapping(target = "isDemoData", expression = "java(entity.isDemoData())")

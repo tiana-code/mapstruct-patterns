@@ -32,7 +32,7 @@ import java.util.UUID
  *   - @Named + qualifiedByName for reusable named conversion methods
  *   - Collection mapping: toResponseList delegates to toResponse per element
  */
-@Mapper(componentModel = "spring")
+@Mapper(config = GlobalMapperConfig::class)
 abstract class VesselProfileMapper {
 
     @Mapping(target = "isActive", expression = "java(entity.getActive())")
