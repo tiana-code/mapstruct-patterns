@@ -1,278 +1,158 @@
 # mapstruct-patterns
 
-Production MapStruct Patterns for Kotlin/Java – extracted from a multi-service maritime SaaS platform.
+Production MapStruct patterns for Kotlin and Java, extracted from a multi-service maritime SaaS platform.
 
-Each mapper demonstrates a specific pattern encountered in real production code, with comments focused on the actual implementation in this repository.
+## What This Repository Is
+
+A reference project demonstrating production-ready MapStruct patterns for Kotlin + Spring Boot. Each mapper addresses a real-world mapping challenge with tested solutions.
+
+## Who This Is For
+
+Backend engineers working with DTO/entity mapping in Kotlin or Java services using MapStruct.
+
+## What This Is NOT
+
+- Not a full clean architecture template
+- Not a benchmark project  
+- Not a KSP-based setup (see annotation processing note below)
+
+## Compatibility
+
+| Component | Version | Notes |
+|---|---|---|
+| Java | 17+ | Toolchain 21 |
+| Kotlin | 1.9.25 | With KAPT |
+| Spring Boot | 3.2.5 | |
+| MapStruct | 1.6.3 | |
+| Gradle | 8.x | Kotlin DSL |
+
+## Prerequisites
+
+- JDK 17+ (project uses toolchain 21)
+- Gradle 8.x (wrapper included)
+- IntelliJ IDEA with annotation processing enabled (for IDE support)
+
+## Quick Start
+
+```bash
+git clone https://github.com/tiana-code/mapstruct-patterns.git
+cd mapstruct-patterns
+./gradlew clean build
+./gradlew test
+```
+
+## Inspecting Generated Mappers
+
+Generated sources are located at:
+```
+build/generated/source/kapt/main/
+```
+
+These files show exactly what MapStruct produces from your annotations — useful for understanding edge cases.
+
+## Patterns Demonstrated
+
+### 1. Kotlin `is`-prefix Workaround (VesselProfileMapper)
+MapStruct's Java processor sees `isActive` as JavaBean property `active`, causing incorrect mapping. Solution: explicit `expression = "java(entity.getActive())"`.
+
+### 2. Abstract Class with Computed Fields (CertificateMapper)
+Computed fields like `daysUntilExpiry` and `isExpiringSoon` calculated at mapping time via extracted CertificateExpiryPolicy.
+
+### 3. Extension Function + Exhaustive Enum Dispatch (CIIRecordMapper)
+Kotlin's `when` enforces exhaustive coverage. Domain logic extracted to separate policy objects.
+
+### 4. @IterableMapping + @Named Variants (AuditMapper)
+List endpoints exclude nested findings (avoid N+1), detail endpoints include them. Two named variants control this.
+
+### 5. Manual Response Assembly (VoyageMapper)
+Fully manual assembly for responses with nested statistics and derived fields.
+
+### 6. Spring-Managed Dependency Injection (VoyageEventMapper)
+Constructor-injected MetadataCodec for JSON serialization within mapper.
+
+### 7. Sub-Mapper Delegation (OrganizationMapper)
+Response assembly with enrichment from counts and subscription data.
+
+### 8. Enum-to-String + Collection Join (CargoShipmentMapper)
+Explicit enum serialization and null-safe collection operations.
+
+## Pattern Selection Guide
+
+**Use interface mapper** when mapping is mostly field-to-field with minimal transformation.
+
+**Use abstract class mapper** when helper methods, injected dependencies, or computed fields are required.
+
+**Use manual mapping** when the target depends on multiple sources, includes non-trivial composition, or readability would suffer with multiple `expression = "java(...)"`.
+
+**Use `@AfterMapping`** when post-processing is small, target-specific, and doesn't warrant a separate method.
+
+**Use `expression = "java(...)"` sparingly** — only for simple one-liner expressions like boolean getter workarounds. Complex logic belongs in helper methods or separate services.
 
 ## Architecture
 
 ```mermaid
 graph LR
-    subgraph Mappers
-        VP[VesselProfileMapper<br/>is-prefix fix]
-        CM[CertificateMapper<br/>computed fields]
-        CII[CIIRecordMapper<br/>extension functions]
-        AM[AuditMapper<br/>nested collections]
-        VM[VoyageMapper<br/>manual + expression]
-        VE[VoyageEventMapper<br/>JSON ↔ Map]
-        OM[OrganizationMapper<br/>AfterMapping]
-        CS[CargoShipmentMapper<br/>enum + constant]
-    end
-
-    subgraph Layer
-        E[Entity] -->|MapStruct KAPT| M[Mapper Interface]
-        M -->|generates| J[Java Impl]
-        M --> RQ[Request DTO]
-        M --> RS[Response DTO]
-    end
+    E[Entity] --> M[Mapper]
+    M --> D[DTO/Response]
+    R[Request] --> M
+    M --> E
+    P[Policy] --> M
+    C[Codec] --> M
 ```
 
-## Patterns
+### Boundaries
 
-### Pattern 1: Kotlin `is`-prefix workaround (`VesselProfileMapper`)
+- **Mappers** handle shape-to-shape transformation only
+- **Assemblers** (enrichment methods within mappers) combine entity data with additional inputs like counts
+- **Policies** own business interpretation rules (e.g., "is this certificate expiring soon?")
+- **Codecs** handle serialization concerns (e.g., JSON metadata round-trip)
 
-**The problem.** MapStruct's Java annotation processor sees `isActive` as JavaBean property `active` (strips the `is` prefix per the spec). But the Kotlin primary constructor keeps the parameter name `isActive`. The generated mapping code ends up calling `new Response(... isActive = false ...)` – always false, no error, no warning.
+Mappers should not contain domain rules beyond shape transformation. If a computation grows beyond a simple derivation, extract it to a policy or service.
 
-Affects: `isActive`, `isDemoData`, `isEnabled`, `isIgMember`, any `is*` Boolean.
+## Mapping Quality Rules
 
-```kotlin
-// WRONG – MapStruct silently generates false
-@Mapping(target = "isActive", source = "isActive")
+Project conventions enforced via `GlobalMapperConfig`:
 
-// CORRECT – call the Java getter explicitly
-@Mapping(target = "isActive", expression = "java(entity.getActive())")
-@Mapping(target = "isDemoData", expression = "java(entity.isDemoData())")
-```
+- `unmappedTargetPolicy = ERROR` — build fails on unmapped target fields
+- `unmappedSourcePolicy = IGNORE` — unused source fields are acceptable
+- `injectionStrategy = CONSTRUCTOR` — safer than field injection
+- `nullValueCheckStrategy = ALWAYS` — null-safe mapping
+- `nullValuePropertyMappingStrategy = IGNORE` — null values don't overwrite existing fields
 
-Also demonstrates:
-- `@BeanMapping(nullValuePropertyMappingStrategy = IGNORE)` for PATCH semantics
-- `@Named` + `qualifiedByName` for reusable named converter methods
-- `@Mapping(target = "...", constant = "true")` for compile-time constant defaults
-- Collection mapping: `toResponseList` delegates automatically to `toResponse`
+**Note on update semantics:** The `nullValuePropertyMappingStrategy = IGNORE` is configured globally for MapStruct-generated update methods. However, most update methods in this project are implemented manually with explicit null-checking, not generated by MapStruct. This is a deliberate choice — manual updates give more control over PATCH semantics.
 
----
+## Annotation Processing Note
 
-### Pattern 2: Abstract class with computed fields (`CertificateMapper`)
+This project uses **KAPT** (Kotlin Annotation Processing Tool) because MapStruct is a Java annotation processor. KAPT is in maintenance mode in the Kotlin ecosystem — Kotlin officially recommends KSP for processors that support it. However, MapStruct currently requires KAPT for Kotlin projects. This repository focuses on current stable MapStruct/Kotlin interoperability.
 
-Use `abstract class` when helper methods are reused from `expression = "java(...)"`. Computed fields (`daysUntilExpiry`, `isExpiringSoon`) are derived at mapping time and never stored in the entity.
+## Known Limitations and Trade-offs
 
-```kotlin
-@Mapper(componentModel = "spring", nullValuePropertyMappingStrategy = NullValuePropertyMappingStrategy.IGNORE)
-abstract class CertificateMapper {
+- **KAPT-based build** — not KSP-native (see note above)
+- **`expression = "java(...)"`** is not type-safe and reduces IDE support — used sparingly for `is*` prefix workaround
+- **JSON parsing fallbacks** (`emptyMap()`) are demonstrated as tolerant-read examples, not universal defaults
+- **Manual update methods** bypass MapStruct's `@MappingTarget` — intentional for finer PATCH control
+- **Deterministic testing** requires explicit date/time parameters in helper methods
 
-    @Mapping(target = "daysUntilExpiry", expression = "java(calculateDaysUntilExpiry(entity))")
-    @Mapping(target = "isExpiringSoon", expression = "java(isExpiringSoon(entity))")
-    @Mapping(target = "isDemoData", expression = "java(entity.isDemoData())")
-    abstract fun toResponse(entity: Certificate): CertificateResponse
+## Testing Strategy
 
-    fun calculateDaysUntilExpiry(entity: Certificate, currentDate: LocalDate = LocalDate.now()): Long =
-        ChronoUnit.DAYS.between(currentDate, entity.expiryDate)
+This repository verifies:
 
-    fun isExpiringSoon(entity: Certificate): Boolean {
-        val days = calculateDaysUntilExpiry(entity)
-        return days in 0..30
-    }
-}
-```
-
----
-
-### Pattern 3: Extension function on mapper + exhaustive enum dispatch (`CIIRecordMapper`)
-
-When the response combines a request object AND a separate calculation result, MapStruct cannot merge two sources automatically. Define an extension function outside the interface – it keeps the mapper clean and is easy to test independently. Kotlin's `when` is exhaustive over sealed enums so the compiler enforces all branches.
-
-```kotlin
-fun CIIRecordMapper.toCalculationResponse(
-    request: CalculateCIIRequest,
-    result: CIIRecordMapper.CIIResult
-): CIICalculationResponse {
-    val recommendation = when (result.rating) {
-        CIIRating.A, CIIRating.B -> null
-        CIIRating.C -> "Monitor performance to maintain compliance"
-        CIIRating.D -> "Develop and implement SEEMP Part III"
-        CIIRating.E -> "Immediate corrective action required"
-    }
-    return CIICalculationResponse(...)
-}
-```
-
----
-
-### Pattern 4: `@IterableMapping` + `@Named` variants for list vs detail (`AuditMapper`)
-
-A list endpoint returns `AuditResponse` without nested findings (avoids N+1), a detail endpoint includes them. Both use the same DTO. The solution is two named variants and `@IterableMapping` to control which one the list method calls.
-
-```kotlin
-@Named("toResponseWithFindings")
-@Mapping(target = "findings", source = "findings")
-abstract fun toResponse(entity: Audit): AuditResponse
-
-@Named("toResponseWithoutFindings")
-@Mapping(target = "findings", ignore = true)
-abstract fun toResponseWithoutFindings(entity: Audit): AuditResponse
-
-@IterableMapping(qualifiedByName = ["toResponseWithoutFindings"])
-abstract fun toResponseList(entities: List<Audit>): List<AuditResponse>
-```
-
-Also demonstrates nested source path navigation:
-```kotlin
-// Reads audit.id from the parent relationship
-@Mapping(target = "auditId", source = "audit.id")
-abstract fun toFindingResponse(entity: AuditFinding): AuditFindingResponse
-```
-
----
-
-### Pattern 5: Manual `toResponse` with explicit server-side defaults (`VoyageMapper`)
-
-When a response DTO contains a nested sub-object computed from multiple entity fields, a fully manual `toResponse()` is cleaner than `@AfterMapping` mutations. Create-time timestamps and enum defaults are injected via `expression = "java(...)"`, while helper methods accept explicit timestamps for deterministic tests.
-
-```kotlin
-@Mapping(target = "status", expression = "java(com.mapstructpatterns.model.enums.VoyageStatus.PLANNED)")
-@Mapping(target = "createdAt", expression = "java(java.time.Instant.now())")
-@Mapping(target = "updatedAt", expression = "java(java.time.Instant.now())")
-abstract fun toEntity(request: CreateVoyageRequest): Voyage
-```
-
-Manual update with Kotlin null-safety:
-```kotlin
-fun updateFromRequest(voyage: Voyage, request: UpdateVoyageRequest, updatedAt: Instant = Instant.now()): Voyage {
-    request.status?.let { voyage.status = it }
-    voyage.updatedAt = updatedAt
-    return voyage
-}
-```
-
----
-
-### Pattern 6: Spring-managed dependency inside mapper (`VoyageEventMapper`)
-
-MapStruct with `componentModel = "spring"` generates a `@Component` class. An `abstract class` mapper can reuse Spring-managed collaborators in manual methods. Used here to inject `ObjectMapper` for JSON serialization of the metadata field (stored as `String` in entity, exposed as `Map<String,Any>` in DTO).
-
-```kotlin
-@Mapper(componentModel = "spring")
-abstract class VoyageEventMapper {
-
-    @Autowired
-    protected lateinit var objectMapper: ObjectMapper
-
-    fun toEntity(request: CreateVoyageEventRequest, voyage: Voyage): VoyageEvent {
-        return VoyageEvent().also { event ->
-            event.metadata = request.metadata?.let { objectMapper.writeValueAsString(it) }
-            event.isDemoData = voyage.isDemoData   // inherit from parent
-        }
-    }
-
-    fun toResponse(event: VoyageEvent): VoyageEventResponse {
-        return VoyageEventResponse(
-            metadata = event.metadata?.let {
-                try { objectMapper.readValue<Map<String, Any>>(it) }
-                catch (_: Exception) { emptyMap() }   // silent fallback – never throw on read
-            }, ...
-        )
-    }
-}
-```
-
----
-
-### Pattern 7: `@AfterMapping` post-processor + delegated sub-mapper (`OrganizationMapper`)
-
-`@AfterMapping` runs after MapStruct finishes its generated code and mutates the target. Used here to enforce that `code` is always uppercase regardless of request input. Sub-mappers (`SubscriptionMapper`) are delegated through `uses`, so manual field injection is not needed.
-
-```kotlin
-@AfterMapping
-protected fun uppercaseCode(request: CreateOrganizationRequest, @MappingTarget entity: Organization) {
-    entity.code = request.code.uppercase()
-}
-```
-
-```kotlin
-@Mapper(componentModel = "spring", uses = [SubscriptionMapper::class])
-abstract class OrganizationMapper
-```
-
----
-
-### Pattern 8: Enum-to-string + `@constant` + collection join expression (`CargoShipmentMapper`)
-
-Three Java expression patterns in one mapper:
-
-```kotlin
-// Explicit enum.name() – immune to toString() overrides
-@Mapping(target = "status", expression = "java(entity.getStatus().name())")
-
-// Hardcoded constant string for a field
-@Mapping(target = "dataSource", constant = "LIVE")
-
-// Null-safe collection join inline
-@Mapping(
-    target = "containerIds",
-    expression = "java(request.getContainerIds() != null ? String.join(\",\", request.getContainerIds()) : null)"
-)
-```
-
-`@Named` for human-readable status descriptions reusable across mappers:
-```kotlin
-@Named("mapStatusDescription")
-fun mapStatusDescription(status: ShipmentStatus): String = when (status) {
-    ShipmentStatus.BOOKED -> "Shipment booked, awaiting loading"
-    ...
-}
-```
-
----
-
-## Project Structure
-
-```
-src/main/kotlin/com/mapstructpatterns/
-  mapper/
-    VesselProfileMapper.kt   Pattern 1: is-prefix + @BeanMapping
-    CertificateMapper.kt     Pattern 2: abstract class + computed fields
-    CIIRecordMapper.kt       Pattern 3: extension function + enum when
-    AuditMapper.kt           Pattern 4: @IterableMapping + @Named variants
-    VoyageMapper.kt          Pattern 5: manual toResponse + Instant.now()
-    VoyageEventMapper.kt     Pattern 6: @Autowired ObjectMapper injection
-    OrganizationMapper.kt    Pattern 7: @AfterMapping + sub-mapper injection
-    CargoShipmentMapper.kt   Pattern 8: enum-to-string + constant + join
-  model/
-    entity/          JPA-style entities (class, not data class)
-    dto/
-      request/       Jakarta-validated request DTOs
-      response/      Response DTOs (data class with nullable fields)
-    enums/           Shared enums in dedicated directory
-src/test/kotlin/com/mapstructpatterns/
-  mapper/            Unit tests for generated and manual mapper behavior
-```
-
-## Tech Stack
-
-| Component | Version |
-|-----------|---------|
-| Kotlin | 1.9.25 |
-| Spring Boot | 3.2.5 |
-| MapStruct | 1.6.3 |
-| KAPT | 1.9.25 |
-| JUnit 5 | via Spring Boot BOM |
-| MockK | 1.13.10 |
-| JTS Core | 1.19.0 |
+- Generated MapStruct mappings via real `*Impl` classes
+- Kotlin boolean `is*` prefix edge cases
+- Update/PATCH null-ignore behavior
+- Computed fields with deterministic dates
+- Manual mapping branches
+- JSON serialization/deserialization via MetadataCodec
+- Enum exhaustiveness and status descriptions
 
 ## Building
 
 ```bash
-./gradlew build
-./gradlew test
+./gradlew build        # compile + test
+./gradlew test         # tests only
+./gradlew clean build  # full rebuild with KAPT regeneration
 ```
 
-KAPT processes MapStruct annotations and generates implementation classes in `build/generated/source/kapt/`.
+## License
 
-## Key Rules Applied
-
-- All entities use `class` (not `data class`) – MapStruct generates setters via reflection
-- Entity IDs are `UUID? = null` (database assigns)
-- Nullable fields belong in DTOs, not entities
-- Every `is`-prefixed Boolean uses `expression = "java(entity.isXxx())"` in `toResponse`
-- DataSource fallback: `try { DataSource.valueOf(it) } catch (_: Exception) { DataSource.REAL }`
-- `@BeanMapping(nullValuePropertyMappingStrategy = IGNORE)` on all update methods (PATCH semantics)
+CC BY-NC 4.0 — see [LICENSE](./LICENSE)

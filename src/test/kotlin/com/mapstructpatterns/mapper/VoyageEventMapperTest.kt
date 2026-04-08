@@ -17,10 +17,10 @@ class VoyageEventMapperTest {
 
     private val codec = MetadataCodec(jacksonObjectMapper())
 
-    private val mapper = object : VoyageEventMapper() {
-        init {
-            metadataCodec = codec
-        }
+    private val mapper = object : VoyageEventMapper() {}.also {
+        val field = VoyageEventMapper::class.java.getDeclaredField("metadataCodec")
+        field.isAccessible = true
+        field.set(it, codec)
     }
 
     private fun testVoyage(): Voyage = Voyage(
@@ -117,5 +117,31 @@ class VoyageEventMapperTest {
         assertNotNull(json)
         assertTrue(json!!.contains("\"a\""))
         assertTrue(json.contains("\"two\""))
+    }
+
+    @Test
+    fun `generated impl maps voyage event correctly`() {
+        val voyageEventMapperImpl = VoyageEventMapperImpl().also {
+            val field = VoyageEventMapper::class.java.getDeclaredField("metadataCodec")
+            field.isAccessible = true
+            field.set(it, codec)
+        }
+        val voyage = testVoyage()
+        val request = CreateVoyageEventRequest(
+            eventType = VoyageEventType.DEPARTURE,
+            eventTime = Instant.parse("2026-04-05T08:00:00Z"),
+            latitude = 51.9,
+            longitude = 4.5,
+            description = "Left port",
+            metadata = mapOf("pilot" to "J. Smith")
+        )
+
+        val event = voyageEventMapperImpl.toEntity(request, voyage)
+
+        assertEquals(VoyageEventType.DEPARTURE, event.eventType)
+        assertEquals(51.9, event.latitude)
+        assertNotNull(event.metadata)
+        assertTrue(event.metadata!!.contains("pilot"))
+        assertEquals(voyage, event.voyage)
     }
 }

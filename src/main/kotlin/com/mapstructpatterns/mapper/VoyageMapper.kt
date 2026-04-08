@@ -11,6 +11,16 @@ import java.time.Instant
 import java.util.UUID
 
 /**
+ * Voyage mapping and response assembly.
+ *
+ * Pure mappings: toEntity, updateFromRequest
+ * Assembler methods: toResponse (builds nested statistics),
+ * toStatisticsResponse (computes derived fields like sailingHours)
+ *
+ * Statistics computation is kept here because it's tightly coupled
+ * to the response shape, but could be extracted to a dedicated
+ * VoyageStatisticsAssembler if complexity grows.
+ *
  * Pattern 5: Abstract class mapper with manual response mapping and explicit server-side defaults
  *
  * WHEN TO USE MANUAL MAPPING:

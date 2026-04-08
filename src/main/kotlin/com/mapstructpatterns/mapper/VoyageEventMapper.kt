@@ -1,11 +1,11 @@
 package com.mapstructpatterns.mapper
 
 import org.mapstruct.Mapper
+import org.springframework.beans.factory.annotation.Autowired
 import com.mapstructpatterns.dto.request.CreateVoyageEventRequest
 import com.mapstructpatterns.dto.response.VoyageEventResponse
 import com.mapstructpatterns.model.entity.Voyage
 import com.mapstructpatterns.model.entity.VoyageEvent
-import org.springframework.beans.factory.annotation.Autowired
 import java.time.Instant
 
 /**
@@ -17,7 +17,10 @@ import java.time.Instant
  *
  * HOW IT WORKS:
  *   MapStruct with GlobalMapperConfig generates a Spring @Component class.
- *   Constructor injection via the config's injectionStrategy = CONSTRUCTOR.
+ *   MetadataCodec is declared in `uses` so MapStruct's generated impl receives it via constructor injection.
+ *   The abstract base class accesses it via @Autowired field injection — this is an intentional exception
+ *   to the project's constructor injection preference, because MapStruct's Java annotation processor
+ *   generates a subclass that cannot call super() with constructor parameters from abstract Kotlin classes.
  *   JSON logic extracted into MetadataCodec — mapper stays focused on shape transformation.
  *
  * ALSO SHOWN HERE:
@@ -26,7 +29,7 @@ import java.time.Instant
  *   - MetadataCodec handles JSON round-trip with logged fallback for malformed data
  *   - isDemoData inherited from parent voyage (not from request)
  */
-@Mapper(config = GlobalMapperConfig::class)
+@Mapper(config = GlobalMapperConfig::class, uses = [MetadataCodec::class])
 abstract class VoyageEventMapper {
 
     @Autowired

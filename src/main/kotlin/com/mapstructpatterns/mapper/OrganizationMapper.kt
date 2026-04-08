@@ -11,6 +11,15 @@ import com.mapstructpatterns.model.entity.Organization
 import com.mapstructpatterns.model.entity.Subscription
 
 /**
+ * Organization mapping and response assembly.
+ *
+ * This mapper contains both pure shape mappings (toEntity, updateEntity)
+ * and response assembly methods (toDto, toSummaryDto) that enrich
+ * responses with additional data like counts and subscription info.
+ *
+ * Assembler methods are marked with @JvmStatic-style naming (toDto with extra params)
+ * to distinguish them from pure MapStruct-generated mappings.
+ *
  * Pattern 7: Manual enrichment + delegated sub-mapper + active subscription lookup
  *
  * MANUAL toDto():

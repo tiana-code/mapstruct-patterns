@@ -6,6 +6,7 @@ import com.mapstructpatterns.model.entity.CIIRecord
 import com.mapstructpatterns.model.CIIComputationResult
 import com.mapstructpatterns.model.enums.CIIRating
 import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertNotNull
 import org.junit.jupiter.api.Assertions.assertNull
 import org.junit.jupiter.api.Test
@@ -111,5 +112,25 @@ class CIIRecordMapperTest {
             assertEquals(rating, response.rating)
             assertEquals(expectedPrefix, response.ratingDescription.substringBefore(" -"))
         }
+    }
+
+    @Test
+    fun `generated impl maps all fields correctly`() {
+        val impl = CIIRecordMapperImpl()
+        val entity = CIIRecord(
+            vesselId = UUID.randomUUID(),
+            calculationYear = 2024,
+            vesselType = "TANKER",
+            dwt = 80000.0,
+            distanceTravelled = 45000.0,
+            fuelConsumptionMt = 1800.0
+        )
+
+        val response = impl.toResponse(entity)
+
+        assertEquals(2024, response.calculationYear)
+        assertEquals("TANKER", response.vesselType)
+        assertEquals(80000.0, response.dwt)
+        assertFalse(response.isDemoData)
     }
 }

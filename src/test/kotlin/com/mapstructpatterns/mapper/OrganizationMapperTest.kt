@@ -7,6 +7,7 @@ import com.mapstructpatterns.model.entity.Organization
 import com.mapstructpatterns.model.entity.Subscription
 import com.mapstructpatterns.model.entity.TariffPlan
 import com.mapstructpatterns.model.enums.SubscriptionStatus
+import java.util.UUID
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertNotNull
 import org.junit.jupiter.api.Assertions.assertNull
@@ -99,5 +100,37 @@ class OrganizationMapperTest {
 
         assertEquals("New Name", org.name)
         assertEquals("old@example.com", org.contactEmail)
+    }
+
+    @Test
+    fun `generated impl toEntity creates organization with uppercased code`() {
+        val organizationMapperImpl = OrganizationMapperImpl()
+
+        val request = CreateOrganizationRequest(
+            name = "Sea Carrier Ltd",
+            code = "sc",
+            contactEmail = "contact@seacarrier.com"
+        )
+
+        val entity = organizationMapperImpl.toEntity(request)
+
+        assertEquals("Sea Carrier Ltd", entity.name)
+        assertEquals("SC", entity.code)
+        assertEquals("contact@seacarrier.com", entity.contactEmail)
+    }
+
+    @Test
+    fun `generated impl toSummaryDto maps id name code`() {
+        val organizationMapperImpl = OrganizationMapperImpl()
+
+        val org = Organization(name = "Global Lines", code = "gl")
+        val idField = org.javaClass.superclass.getDeclaredField("id")
+        idField.isAccessible = true
+        idField.set(org, UUID.randomUUID())
+
+        val summary = organizationMapperImpl.toSummaryDto(org)
+
+        assertEquals("Global Lines", summary.name)
+        assertEquals("GL", summary.code)
     }
 }
