@@ -94,4 +94,56 @@ class CertificateMapperTest {
 
         assertTrue(response.isDemoData)
     }
+
+    @Test
+    fun `generated impl maps all fields correctly`() {
+        val impl = CertificateMapperImpl()
+        val entity = Certificate(
+            vesselId = UUID.randomUUID(),
+            certificateType = "SAFETY",
+            certificateNumber = "CERT-006",
+            issuedBy = "Bureau Veritas",
+            issueDate = today.minusYears(1),
+            expiryDate = today.plusDays(60),
+            notes = "Annual renewal",
+            isDemoData = false,
+            dataSource = DataSource.REAL
+        )
+
+        val response = impl.toResponse(entity)
+
+        assertEquals("CERT-006", response.certificateNumber)
+        assertEquals("Bureau Veritas", response.issuedBy)
+        assertEquals("Annual renewal", response.notes)
+        assertFalse(response.isDemoData)
+    }
+
+    @Test
+    fun `generated impl toResponseList maps each element`() {
+        val impl = CertificateMapperImpl()
+        val entities = listOf(
+            Certificate(
+                vesselId = UUID.randomUUID(),
+                certificateType = "SAFETY",
+                certificateNumber = "CERT-007",
+                issuedBy = "Lloyd's Register",
+                issueDate = today.minusYears(1),
+                expiryDate = today.plusDays(10)
+            ),
+            Certificate(
+                vesselId = UUID.randomUUID(),
+                certificateType = "LOAD_LINE",
+                certificateNumber = "CERT-008",
+                issuedBy = "DNV",
+                issueDate = today.minusYears(2),
+                expiryDate = today.plusDays(100)
+            )
+        )
+
+        val responses = impl.toResponseList(entities)
+
+        assertEquals(2, responses.size)
+        assertEquals("CERT-007", responses[0].certificateNumber)
+        assertEquals("CERT-008", responses[1].certificateNumber)
+    }
 }

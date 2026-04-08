@@ -45,4 +45,44 @@ class CargoShipmentMapperTest {
 
         assertEquals("IN_TRANSIT", entity.status.name)
     }
+
+    @Test
+    fun `generated impl maps all fields correctly`() {
+        val impl = CargoShipmentMapperImpl()
+        val entity = CargoShipment(
+            vesselId = UUID.randomUUID(),
+            billOfLading = "BL-002",
+            originPortName = "Singapore",
+            destinationPortName = "Shanghai",
+            cargoType = "CONTAINERS",
+            status = ShipmentStatus.LOADED
+        )
+
+        val response = impl.toResponse(entity)
+
+        assertEquals("Singapore", response.originPort)
+        assertEquals("Shanghai", response.destinationPort)
+        assertEquals("LOADED", response.status)
+        assertEquals("Cargo loaded onto vessel", response.statusDescription)
+    }
+
+    @Test
+    fun `generated impl toResponseList maps each element`() {
+        val impl = CargoShipmentMapperImpl()
+        val entities = listOf(
+            CargoShipment(
+                vesselId = UUID.randomUUID(),
+                billOfLading = "BL-003",
+                originPortName = "Tokyo",
+                destinationPortName = "Busan",
+                cargoType = "BULK",
+                status = ShipmentStatus.DELIVERED
+            )
+        )
+
+        val responses = impl.toResponseList(entities)
+
+        assertEquals(1, responses.size)
+        assertEquals("Cargo delivered to consignee", responses[0].statusDescription)
+    }
 }

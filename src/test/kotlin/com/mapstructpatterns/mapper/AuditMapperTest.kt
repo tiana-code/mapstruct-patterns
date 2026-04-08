@@ -3,7 +3,9 @@ package com.mapstructpatterns.mapper
 import com.mapstructpatterns.model.entity.Audit
 import com.mapstructpatterns.model.entity.AuditFinding
 import com.mapstructpatterns.model.enums.AuditType
+import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
+import org.junit.jupiter.api.Assertions.assertNotNull
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 import java.time.LocalDate
@@ -82,5 +84,26 @@ class AuditMapperTest {
         audit.markDetained()
 
         assertTrue(audit.detained)
+    }
+
+    @Test
+    fun `generated impl maps toResponseList without findings`() {
+        val impl = AuditMapperImpl()
+
+        val audit = Audit(
+            vesselId = UUID.randomUUID(),
+            auditType = AuditType.PSC,
+            auditDate = today,
+            port = "Rotterdam",
+            inspectorName = "John Smith",
+            userId = testUserId
+        )
+
+        val responses = impl.toResponseList(listOf(audit))
+
+        assertNotNull(responses)
+        assertEquals(1, responses.size)
+        assertEquals("Rotterdam", responses[0].port)
+        assertFalse(responses[0].isDemoData)
     }
 }
