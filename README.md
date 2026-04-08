@@ -155,4 +155,4 @@ This repository verifies:
 
 ## License
 
-CC BY-NC 4.0 — see [LICENSE](./LICENSE)
+MIT — see [LICENSE](./LICENSE)
